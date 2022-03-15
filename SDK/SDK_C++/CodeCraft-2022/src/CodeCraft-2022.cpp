@@ -68,11 +68,13 @@ int read_qos(string filename){ //读取qos
 
 
 int main(){
-    vector<vector<string>> vect = read_csv("../data/site_bandwidth.csv"); //
-    int id = 0;
+    vector<vector<string>> vect = read_csv("/data/site_bandwidth.csv"); //
+    int site_num = 0; //number of sites
+    int customer_num = 0; // number of customers
+    int T = 0; //number of time
     vector<site> sites; //边缘节点的集合
     vector<customer> customers; //客户的集合
-    int Qos = read_qos("../data/config.ini");
+    int Qos = read_qos("/data/config.ini");
 
     //遍历用 以下读取数据
     vector<string> temp_vect;
@@ -83,7 +85,7 @@ int main(){
     {
         site new_site;
         temp_vect = *ite;
-        new_site.id = id++;
+        new_site.id = site_num++;
         new_site.site_name = temp_vect[0];
         new_site.bandwidth = str_to_int(temp_vect[1]);
         sites.push_back(new_site);
@@ -93,29 +95,36 @@ int main(){
     // for (vector<site>::iterator itor = sites.begin(); itor != sites.end(); itor++){
     //     cout << itor->site_name << "  " << itor->bandwidth << endl;
     // }
-    vect = read_csv("../data/demand.csv");
+    vect = read_csv("/data/demand.csv");
     ite = vect.begin();
     temp_vect = *ite;
-    id = 0;
+
+    
     for (vector<string>::iterator itee = ++temp_vect.begin(); itee != temp_vect.end(); itee++){
-        customers.push_back(customer(id++, *itee));
+        string s_t = *itee;
+        int l_t = s_t.size();
+        if (s_t[l_t-1] == '\r'){
+            s_t = s_t.substr(0,l_t-1);
+        }
+        customers.push_back(customer(customer_num++, s_t));
     }
     for (ite = ++vect.begin(); ite != vect.end(); ite++)
     {
         temp_vect = *ite;
         itc = customers.begin();
+        T++;
         for (vector<string>::iterator itee = ++temp_vect.begin(); itee != temp_vect.end(); itee++){
             itc->bandwidth_need.push_back(str_to_int(*itee));
             itc++;
         }
     }
-    vect = read_csv("../data/qos.csv");
+    vect = read_csv("/data/qos.csv");
     int t = 0;
     for (ite = ++vect.begin(); ite != vect.end(); ite++){
         temp_vect = *ite;
         itc = customers.begin();
         for (vector<string>::iterator itee = ++temp_vect.begin(); itee != temp_vect.end(); itee++){
-            if(str_to_int(*itee) <= Qos){
+            if(str_to_int(*itee) < Qos){
                 itc->qos.push_back(t);
             } 
             // cout << str_to_int(*itee) << endl;
@@ -139,5 +148,35 @@ int main(){
     // }
     // cout << Qos << endl;
     //数据读取完毕 以下处理数据
+    ofstream outfile("/output/solution.txt");
+    for (int time_i = 0; time_i<T; time_i++){
+        vector<int> bandwidth_cust_need;
+        vector<int> bandwidth_site_left;
+        for (int i=0; i<customer_num; i++){
+            bandwidth_cust_need.push_back(customers[i].bandwidth_need[time_i]);
+        }
+        for ( int i=0; i<site_num; i++){
+            bandwidth_site_left.push_back(sites[i].bandwidth);
+        }
+        for ( int i=0; i<customer_num; i++){
+            outfile << customers[i].customer_name << ":";
+            int n = customers[i].qos.size();
+            for ( int j=0; j<n; j++){
+                int temp_qos = customers[i].qos[j];
+                if (bandwidth_cust_need[i] <= bandwidth_site_left[temp_qos]){
+                    bandwidth_site_left[temp_qos] -= bandwidth_cust_need[i];
+                    outfile << "<" << sites[temp_qos].site_name << "," << bandwidth_cust_need[i] << ">";
+                    break;
+                }
+                else if(bandwidth_site_left[temp_qos] != 0){
+                    bandwidth_cust_need[i] -=bandwidth_site_left[temp_qos];
+                    outfile << "<" << sites[temp_qos].site_name << "," << bandwidth_site_left[temp_qos] << ">" << ",";
+                    bandwidth_site_left[temp_qos] = 0;
+                }
+            }
+            outfile << endl;
+
+        }
+    }
     return 0;
 }
