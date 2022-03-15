@@ -29,6 +29,8 @@ class customer{ //客户
 };
 int str_to_int(string s){ //str转int
     int l = s.size();
+    if (s[l-1] == '\r')
+        l--;
     int ans = 0;
     for ( int i = 0; i<l; i++){
         ans = ans * 10 + s[i]-'0';
@@ -108,29 +110,34 @@ int main(){
         }
     }
     vect = read_csv("../data/qos.csv");
+    int t = 0;
     for (ite = ++vect.begin(); ite != vect.end(); ite++){
         temp_vect = *ite;
         itc = customers.begin();
         for (vector<string>::iterator itee = ++temp_vect.begin(); itee != temp_vect.end(); itee++){
-            itc->qos.push_back(str_to_int(*itee));
-            cout << *itee << endl;
+            if(str_to_int(*itee) <= Qos){
+                itc->qos.push_back(t);
+            } 
+            // cout << str_to_int(*itee) << endl;
             itc++;
         }
+        t++;
+
     }
     
-    for (itc=customers.begin(); itc != customers.end(); itc++){
-        cout << itc->id << " " << itc->customer_name << endl;
-        cout << "bandwidth_need:" << endl;
-        for (vector<int>::iterator itor=itc->bandwidth_need.begin(); itor !=itc->bandwidth_need.end(); itor++){
-            cout << *itor << endl;
-        }
-        cout << endl;
-        cout << "qos:" << endl;
-        for (vector<int>::iterator itor=itc->qos.begin(); itor !=itc->qos.end(); itor++){
-            cout << *itor << endl;
-        }
-    }
-    cout << Qos << endl;
+    // for (itc=customers.begin(); itc != customers.end(); itc++){
+    //     cout << itc->id << " " << itc->customer_name << endl;
+    //     cout << "bandwidth_need:" << endl;
+    //     for (vector<int>::iterator itor=itc->bandwidth_need.begin(); itor !=itc->bandwidth_need.end(); itor++){
+    //         cout << *itor << endl;
+    //     }
+    //     cout << endl;
+    //     cout << "qos:" << endl;
+    //     for (vector<int>::iterator itor=itc->qos.begin(); itor !=itc->qos.end(); itor++){
+    //         cout << *itor << endl;
+    //     }
+    // }
+    // cout << Qos << endl;
     //数据读取完毕 以下处理数据
     return 0;
 }
