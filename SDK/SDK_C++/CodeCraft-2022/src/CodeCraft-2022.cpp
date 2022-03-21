@@ -165,10 +165,13 @@ void outputRes(){
         for (int i = 0; i < customer_num; i++){
             outfile << customers[i].customer_name << ":";
             int n = customers[i].infos[t].size();
-            int j = 0;
-            for (; j < n - 1; j++)
-                outfile << "<" << customers[i].infos[t][j].site_name_from << "," << customers[i].infos[t][j].bandwidth << ">" << ",";
-            outfile << "<" << customers[i].infos[t][j].site_name_from << "," << customers[i].infos[t][j].bandwidth << ">";
+            if(n != 0){
+                int j = 0;
+                for (; j < n - 1; j++){
+                    outfile << "<" << customers[i].infos[t][j].site_name_from << "," << customers[i].infos[t][j].bandwidth << ">" << ",";
+                }
+                outfile << "<" << customers[i].infos[t][j].site_name_from << "," << customers[i].infos[t][j].bandwidth << ">";
+            }
             outfile << endl;
         }
     }
@@ -211,7 +214,6 @@ void sortSites(vector<int> &a, int low, int high, vector<site> &sites){
     if (high <= low) return;
     int i = low;
     int j = high;
-    int key_index = low;
     int key = sites[a[low]].bandwidth/sites[a[low]].qos_num;
     while(i<j){
         while (i < j && sites[a[j]].bandwidth/sites[a[j]].qos_num <= key){
@@ -237,7 +239,6 @@ void sortSites(vector<int> &a, int low, int high, vector<site> &sites){
      if (high <= low) return;
      int i = low;
      int j = high;
-     int key_index = low;
      int key = customers[a[low]].qos.size(); // 排序依据
      while(i < j){
          while (i < j && customers[a[j]].qos.size() <= key){
@@ -336,7 +337,6 @@ vector<SubCustomer> preprocess(int n, vector<site> &sites, vector<customer> &cus
 void dfsAlgorithm(){
     vector<SubCustomer> subCustomers = preprocess(10, sites, customers); // n = 10
 //    for(auto & subCustomer : subCustomers){
-//
 //    }
     vector<int> bandwidth;
     for(int i = 0; i < site_num; i++){
@@ -348,13 +348,19 @@ void dfsAlgorithm(){
     for(int t = 0; t < T; t++){
         map<int, int> infoMap; // 边缘节点ID * 100 + 客户节点ID, 需求量
         vector<int> bandwidthLeft = bandwidth;
-        dfs(subCustomers, bandwidthLeft, 0, t, infoMap);
+        if(!dfs(subCustomers, bandwidthLeft, 0, t, infoMap)) cout << "ERROR!\n";
 
         for(auto & it : infoMap){
             // cout << it.first << " " << it.second << "\n";
+
             int iCus = it.first % 100;
             int iSite = it.first / 100;
-            customers[iCus].infos[t].push_back({sites[iSite].site_name, it.second});
+            if(it.second != 0) {
+                customers[iCus].infos[t].push_back({sites[iSite].site_name, it.second});
+            }
+//            if(it.second == 0){
+//                cout << t << " " << sites[iSite].site_name << " " << customers[iCus].customer_name << " " << it.second << "\n";
+//            }
         }
         // cout << "---------------------------------\n\n";
 
