@@ -1,0 +1,1 @@
+/Library/Developer/CommandLineTools/usr/bin/c++  -O3 -Wall -std=c++11 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX10.15.sdk -Wl,-search_paths_first -Wl,-headerpad_max_install_names "CMakeFiles/CodeCraft-2022.dir/CodeCraft-2022.cpp.o" -o /Users/wangmingxuan/Downloads/Real-Expert/SDK/SDK_C++/bin/CodeCraft-2022 
