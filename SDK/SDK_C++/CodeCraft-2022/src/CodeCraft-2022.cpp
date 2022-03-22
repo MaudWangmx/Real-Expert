@@ -149,6 +149,10 @@ void outputRes(){
         for (int i = 0; i < customer_num; i++){
             outfile << customers[i].customer_name << ":";
             int n = customers[i].infos[t].size();
+            if (n == 0) {
+                outfile << endl;
+                continue;
+            }
             int j = 0;
             for (; j < n - 1; j++)
                 outfile << "<" << customers[i].infos[t][j].site_name_from << "," << customers[i].infos[t][j].bandwidth << ">" << ",";
@@ -287,9 +291,15 @@ void arrangeOneSite(int site_id, int site_average, int t, int* customer_satisfie
     int total_weight = 0;
 
     for (int i = 0; i < n; i++){
+        if (customers[sites[s].servable_customers[i]].qos.size() == 0){
+            site_weights[i] = 0;
+            continue;
+        }
         site_weights[i] = customers[sites[s].servable_customers[i]].bandwidth_need[t] / customers[sites[s].servable_customers[i]].qos.size();
         total_weight += site_weights[i];
     }
+    if (total_weight == 0)
+        return;
     int site_average_c = floor(site_average / total_weight);
     for (int i = 0; i < n; i++){        // i for customer index in one site's servable_customers list
         int customer_id = sites[s].servable_customers[i];
@@ -401,12 +411,14 @@ bool trick(){
     if (timeP > 0){
         int site_num_per_tp = (int)(site_num - 1) * timeP / T;  // num of sites chosen per tp
         int timeP_num = ceil((double)T / timeP);    // num of time pieces
-        for (int inter = 0; inter < timeP_num; inter++ ){
+        for (int inter = 0; inter < timeP_num && timeP * inter < T; inter++ ){
             /* in a time piece */
             int start_site = inter * site_num_per_tp;
             for (int tp = 0; tp < timeP; tp++){
                 /* in a click of a time piece */
                 int t = timeP * inter + tp;
+                if (t >= T)
+                    break;
                 int total_bandwidth = 0;
                 memset(site_used, 0, site_num * sizeof(int));
                 memset(customer_satisfied, 0, customer_num * sizeof(int));
@@ -417,7 +429,7 @@ bool trick(){
                     customers[i].infos.push_back(temp_info);
                     memset(arrangement[i], 0, customers[i].qos.size() * sizeof(int));
                 }
-                for (int site_focus = start_site; site_focus < start_site + site_num_per_tp; site_focus++){
+                for (int site_focus = start_site; site_focus < start_site + site_num_per_tp && site_focus < site_num; site_focus++){
                     /* fill one site*/
                     arrangeOneSite(site_focus, sites[site_focus].bandwidth, t, customer_satisfied, site_used, arrangement);
                     total_bandwidth -= site_used[site_focus];
@@ -446,8 +458,9 @@ bool trick(){
                 }
             }
         }
+        return true;
     }
-    else 
+    else
         return false;
 }
 
