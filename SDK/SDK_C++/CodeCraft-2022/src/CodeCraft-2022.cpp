@@ -145,6 +145,10 @@ void outputRes(){
         for (int i = 0; i < customer_num; i++){
             outfile << customers[i].customer_name << ":";
             int n = customers[i].infos[t].size();
+            if (n == 0) {
+                outfile << endl;
+                continue;
+            }
             int j = 0;
             for (; j < n - 1; j++)
                 outfile << "<" << customers[i].infos[t][j].site_name_from << "," << customers[i].infos[t][j].bandwidth << ">" << ",";
