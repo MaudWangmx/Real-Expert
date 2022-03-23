@@ -1,25 +1,24 @@
-#include<iostream>
-#include<istream>
-#include<vector>
-#include<map>
-#include<algorithm>
-#include<sstream>
-#include<fstream>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <cstring>
+#include <string>
+#include <queue>
+#include <map>
+
 using namespace std;
 
-// 边缘节点
+
 typedef struct{
     int id;
     string site_name;
     int bandwidth;
-    int qos_num;
-} site;
+} site; // 边缘节点
 
-// 分配信息
 typedef struct{
     string site_name_from;
     int bandwidth;
-} info;
+} info; // 分配信息
 
 // 客户
 class customer{
@@ -32,29 +31,25 @@ public:
     vector<vector<info>> infos; //分配的结果
 };
 
-class SubCustomer{
-public:
-    SubCustomer(int subID, customer *supCustomer){
-        this->subID = subID;
-        this->supCustomer = supCustomer;
-    }
-    customer *supCustomer;  // 保存所属客户节点指针
-    int subID;
-    vector<int> bandwidthNeeded; // 需求带宽
-};
 
-
-int site_num = 0; //number of sites
-int customer_num = 0; // number of customers
-int T = 0; //number of time
-vector<site> sites; //边缘节点的集合a
+vector<site> sites; //边缘节点的集合
+int site_num = 0;
 vector<customer> customers; //客户的集合
+int customer_num = 0;
+int T = 0;
 int Qos = 0;
+
+// dinic算法所需变量
+int const INF = 0x3f3f3f3f;
+int const MAX_P = 135 + 35 + 5;
+int numP; // 点的个数
+int graphic[MAX_P][MAX_P]; // 所需的图
+int dep[MAX_P]; // 点所在的层数
 
 string datafile_root = "../";
 
 
-int str_to_int(string s){ //str转int
+int str_to_int(string s){
     int l = s.size();
     if (s[l-1] == '\r')
         l--;
@@ -65,8 +60,8 @@ int str_to_int(string s){ //str转int
     return ans;
 }
 
-
-vector<vector<string>> read_csv(string filename) //读csv文件
+// 读csv文件
+vector<vector<string>> read_csv(string filename)
 {
     ifstream inFile(filename);
     string lineStr;
@@ -87,8 +82,8 @@ vector<vector<string>> read_csv(string filename) //读csv文件
     return strArray;
 }
 
-
-int read_qos(string filename){ //读取qos
+// 读取Qos
+int read_qos(string filename){
     ifstream inFile(filename);
     string lineStr;
 
@@ -97,11 +92,10 @@ int read_qos(string filename){ //读取qos
     return str_to_int(lineStr.substr(15));
 }
 
-
 void initializeData(){
     int Qos = read_qos(datafile_root + "data/config.ini");
 
-    vector<vector<string>> vect = read_csv(datafile_root + "data/site_bandwidth.csv"); //
+    vector<vector<string>> vect = read_csv(datafile_root + "data/site_bandwidth.csv");
     //遍历用 以下读取数据
     vector<string> temp_vect;
     vector<vector<string>>::iterator ite;
@@ -114,7 +108,6 @@ void initializeData(){
         new_site.id = site_num++;
         new_site.site_name = temp_vect[0];
         new_site.bandwidth = str_to_int(temp_vect[1]);
-        new_site.qos_num = 0;
         sites.push_back(new_site);
     }
     vect = read_csv(datafile_root + "data/demand.csv");
@@ -122,7 +115,7 @@ void initializeData(){
     temp_vect = *ite;
 
 
-    for (vector<string>::iterator itee = ++temp_vect.begin(); itee != temp_vect.end(); itee++){
+    for (auto itee = ++temp_vect.begin(); itee != temp_vect.end(); itee++){
         string s_t = *itee;
         int l_t = s_t.size();
         if (s_t[l_t-1] == '\r'){
@@ -135,7 +128,7 @@ void initializeData(){
         temp_vect = *ite;
         itc = customers.begin();
         T++;
-        for (vector<string>::iterator itee = ++temp_vect.begin(); itee != temp_vect.end(); itee++){
+        for (auto itee = ++temp_vect.begin(); itee != temp_vect.end(); itee++){
             itc->bandwidth_need.push_back(str_to_int(*itee));
             itc++;
         }
@@ -145,10 +138,9 @@ void initializeData(){
     for (ite = ++vect.begin(); ite != vect.end(); ite++){
         temp_vect = *ite;
         itc = customers.begin();
-        for (vector<string>::iterator itee = ++temp_vect.begin(); itee != temp_vect.end(); itee++){
+        for (auto itee = ++temp_vect.begin(); itee != temp_vect.end(); itee++){
             if(str_to_int(*itee) < Qos){
                 itc->qos.push_back(t);
-                sites[t].qos_num++;
             }
             // cout << str_to_int(*itee) << endl;
             itc++;
@@ -158,25 +150,24 @@ void initializeData(){
     }
 }
 
-
 void outputRes(){
     ofstream outfile(datafile_root + "output/solution.txt");
     for (int t = 0; t < T; t++){
         for (int i = 0; i < customer_num; i++){
             outfile << customers[i].customer_name << ":";
             int n = customers[i].infos[t].size();
-            if(n != 0){
-                int j = 0;
-                for (; j < n - 1; j++){
-                    outfile << "<" << customers[i].infos[t][j].site_name_from << "," << customers[i].infos[t][j].bandwidth << ">" << ",";
-                }
-                outfile << "<" << customers[i].infos[t][j].site_name_from << "," << customers[i].infos[t][j].bandwidth << ">";
+            if (n == 0) {
+                outfile << endl;
+                continue;
             }
+            int j = 0;
+            for (; j < n - 1; j++)
+                outfile << "<" << customers[i].infos[t][j].site_name_from << "," << customers[i].infos[t][j].bandwidth << ">" << ",";
+            outfile << "<" << customers[i].infos[t][j].site_name_from << "," << customers[i].infos[t][j].bandwidth << ">";
             outfile << endl;
         }
     }
 }
-
 
 void vanillaAlgorithm(){
     for (int time_i = 0; time_i<T; time_i++){
@@ -209,172 +200,124 @@ void vanillaAlgorithm(){
     }
 }
 
-
-void sortSites(vector<int> &a, int low, int high, vector<site> &sites){
-    if (high <= low) return;
-    int i = low;
-    int j = high;
-    int key = sites[a[low]].bandwidth/sites[a[low]].qos_num;
-    while(i<j){
-        while (i < j && sites[a[j]].bandwidth/sites[a[j]].qos_num <= key){
-            j--;
-        }
-        while (i < j && sites[a[i]].bandwidth/sites[a[i]].qos_num >= key){
-            i++;
-        }
-        if ( i >= j) break;
-        int temp = a[i];
-        a[i] = a[j];
-        a[j] = temp;
+// 重新按层次建图
+// s为源点，t为汇点
+int dinicBfs(int s, int t){
+    queue<int> q;
+    while(!q.empty()){
+        q.pop();
     }
-    int temp = a[low];
-    a[low] = a[j];
-    a[j] = temp;
-    sortSites(a, low, j-1, sites);
-    sortSites(a,j+1, high, sites);
-}
-
-
- void sortCustoms(vector<int> &a, int low, int high, vector<customer> &customers){
-     if (high <= low) return;
-     int i = low;
-     int j = high;
-     int key = customers[a[low]].qos.size(); // 排序依据
-     while(i < j){
-         while (i < j && customers[a[j]].qos.size() <= key){
-             j--;
-         }
-         while (i < j && customers[a[i]].qos.size() >= key){
-             i++;
-         }
-         if (i >= j) break;
-         int temp = a[i];
-         a[i] = a[j];
-         a[j] = temp;
-     }
-     int temp = a[low];
-     a[low] = a[j];
-     a[j] = temp;
-     sortCustoms(a, low, j-1, customers);
-     sortCustoms(a, j+1, high, customers);
-}
-
-
-vector<SubCustomer> preprocess(int n, vector<site> &sites, vector<customer> &customers){
-    vector<SubCustomer> ret;
-
-    for(int i = 0; i < sites.size(); i++){
-        if(sites[i].qos_num == 0) { // 删除无效边缘节点
-            // sites.erase(begin(sites) + i);
-            // i--;
-            // site_num--;
-            sites[i].qos_num = -1; // 无效标志
+    memset(dep, -1, sizeof(dep));
+    dep[s] = 0; // 源点在第0层
+    q.push(s);
+    while(!q.empty()){
+        int u = q.front();
+        q.pop();
+        for(int v = 0; v <= numP - 1; v++){
+            if(graphic[u][v] > 0 && dep[v] == -1){// 如果点u可以到达点v，且点v还未被访问
+                dep[v] = dep[u] + 1;
+                q.push(v);
+            }
         }
     }
+    return dep[t] != -1; // 返回能否达到汇点
+}
 
-    //sort(customers.begin(), customers.end(), cmpCustomer);
-    vector<int> a;
+// 查找路径上的最小流量
+int dinicDfs(int s, int minFlow, int t, map<int, int> &infoMap){
+    if(s == t){
+        return minFlow;
+    }
+    int tmp;
+    for(int v = 0; v <= numP - 1; v++){
+        if(graphic[s][v] > 0 && dep[v] == dep[s] + 1 && (tmp = dinicDfs(v, min(minFlow, graphic[s][v]), t, infoMap))){
+            graphic[s][v] -= tmp;
+            graphic[v][s] += tmp;
+
+            if(s >= 1 && s <= customer_num && v >= customer_num + 1 && v <= customer_num + site_num){
+                int hash = (v - customer_num - 1) * 100 + (s - 1);
+                if(infoMap.count(hash) == 0 || infoMap[hash] == 0){
+                    infoMap[hash] = tmp;
+                }
+                else{
+                    infoMap[hash] += tmp;
+                }
+            }
+            else if(v >= 1 && v <= customer_num && s >= customer_num + 1 && s <= customer_num + site_num){
+                int hash = (s - customer_num - 1) * 100 + (v - 1);
+                infoMap[hash] -= tmp;
+                if(infoMap[hash] < 0){
+                    cout << "ERROR! infoMap[hash] < 0" << endl;
+                }
+            }
+
+            return tmp;
+        }
+    }
+    return 0;
+}
+
+// t为时刻
+int dinic(int t, map<int, int> &infoMap){
+    // 每一时刻初始化图
+    memset(graphic, 0, sizeof(graphic));
+    numP = site_num + customer_num + 2; // 客户：1 ~ customer_num (id + 1)
+                                        // 边缘节点：customer_num + 1 ~ customer_num + site_num (customer_num + id + 1)
     for(int i = 0; i < customer_num; i++){
-        a.push_back(i);
+        int u = i + 1; // 客户表示的点在图中的标号
+        graphic[0][u] = customers[i].bandwidth_need[t]; // +=
+        for(int j = 0; j < customers[i].qos.size(); j++){
+            int v = customer_num + customers[i].qos[j] + 1;
+            int w = min(customers[i].bandwidth_need[t], sites[customers[i].qos[j]].bandwidth);
+            graphic[u][v] = w; // +=
+        }
     }
-    sortCustoms(a, 0, customer_num - 1, customers);
+    for(int i = 0; i < site_num; i++){
+        int u = customer_num + i + 1;
+        graphic[u][numP - 1] = sites[i].bandwidth;
+    }
 
-    for(int i = 0; i < customer_num; i++){ // 遍历a
-        sortSites(customers[a[i]].qos, 0, customers[a[i]].qos.size() - 1, sites);
-        vector<int> tempBandwidthNeeded;
-        vector<int> tempLastBandwidthNeeded;
-        for(int t = 0; t < T; t++){
-            tempBandwidthNeeded.push_back(customers[a[i]].bandwidth_need[t] / n);
-            tempLastBandwidthNeeded.push_back(customers[a[i]].bandwidth_need[t] - (customers[a[i]].bandwidth_need[t] / n * (n - 1)));
-        }
-        for(int j = 0; j < n; j++){ // 均分为n份
-            SubCustomer tempSubCustomer = SubCustomer(j, &customers[a[i]]);
-            if(j < n - 1){
-                tempSubCustomer.bandwidthNeeded = tempBandwidthNeeded;
+    int ans = 0, tmp;
+    // 源点为0，汇点为customer_num + site_num + 1(numP - 1)
+    while(dinicBfs(0, numP - 1)){
+        while(true){
+            tmp = dinicDfs(0, INF, numP - 1, infoMap);
+            if(tmp == 0){
+                break;
             }
-            else{
-                tempSubCustomer.bandwidthNeeded = tempLastBandwidthNeeded;
-            }
-            ret.push_back(tempSubCustomer);
+            ans += tmp;
         }
     }
-    return ret;
+    return ans;
 }
 
-
- bool dfs(vector<SubCustomer> &subCustomers, vector<int> &bandwidthLeft, int index, int t, map<int, int> &infoMap){
-     if(index == subCustomers.size()) return true;
-
-     vector<int> tempQos = subCustomers[index].supCustomer->qos; // 能满足当前客户节点的边缘节点列表
-
-     for(int i = 0; i < tempQos.size(); i++){ // tempQos[i]为site的标号
-         // subCustomers[index]选sites[tempQos[i]]
-         if(subCustomers[index].bandwidthNeeded[t] > bandwidthLeft[tempQos[i]]){
-             continue;
-         }
-
-         int hash = tempQos[i] * 100 + subCustomers[index].supCustomer->id;
-         if(infoMap.count(hash) == 0 || infoMap[hash] == 0){
-             infoMap[hash] = subCustomers[index].bandwidthNeeded[t];
-         }
-         else{
-             infoMap[hash] += subCustomers[index].bandwidthNeeded[t];
-         }
-         bandwidthLeft[tempQos[i]] -= subCustomers[index].bandwidthNeeded[t];
-         if(dfs(subCustomers, bandwidthLeft, index + 1, t, infoMap)){
-             return true;
-         }
-         else{
-             infoMap[hash] -= subCustomers[index].bandwidthNeeded[t];
-             bandwidthLeft[tempQos[i]] += subCustomers[index].bandwidthNeeded[t];
-         }
-     }
-
-     return false;
- }
-
-
-void dfsAlgorithm(){
-    vector<SubCustomer> subCustomers = preprocess(10, sites, customers); // n = 10
-//    for(auto & subCustomer : subCustomers){
-//    }
-    vector<int> bandwidth;
-    for(int i = 0; i < site_num; i++){
-        bandwidth.push_back(sites[i].bandwidth);
-    }
+void dinicAlgorithm(){
     for(int i = 0; i < customer_num; i++){
         customers[i].infos.resize(T);
     }
     for(int t = 0; t < T; t++){
-        map<int, int> infoMap; // 边缘节点ID * 100 + 客户节点ID, 需求量
-        vector<int> bandwidthLeft = bandwidth;
-        if(!dfs(subCustomers, bandwidthLeft, 0, t, infoMap)) cout << "ERROR!\n";
+        map<int, int> infoMap;
+        dinic(t, infoMap);
 
-        for(auto & it : infoMap){
+        // 处理输出
+        for(auto & it : infoMap) {
             // cout << it.first << " " << it.second << "\n";
-
             int iCus = it.first % 100;
             int iSite = it.first / 100;
             if(it.second != 0) {
                 customers[iCus].infos[t].push_back({sites[iSite].site_name, it.second});
             }
-//            if(it.second == 0){
-//                cout << t << " " << sites[iSite].site_name << " " << customers[iCus].customer_name << " " << it.second << "\n";
-//            }
         }
-        // cout << "---------------------------------\n\n";
 
     }
 
-
 }
-
 
 int main(){
     initializeData();
 
-    dfsAlgorithm();
-    //vanillaAlgorithm();
+    // vanillaAlgorithm();
+    dinicAlgorithm();
 
     outputRes();
     return 0;
