@@ -13,6 +13,9 @@ typedef struct{
     int id;
     string site_name;
     int bandwidth;
+    bool operator == (const string &e){
+        return (this->site_name == e);
+    }
 } site; // 边缘节点
 
 typedef struct{
@@ -28,6 +31,7 @@ public:
     string customer_name;
     vector<int> bandwidth_need; //需求带宽
     vector<int> qos; //需求qos
+    vector<string> qos_name;
     vector<vector<info>> infos; //分配的结果
 };
 
@@ -61,8 +65,7 @@ int str_to_int(string s){
 }
 
 // 读csv文件
-vector<vector<string>> read_csv(string filename)
-{
+vector<vector<string>> read_csv(string filename){
     ifstream inFile(filename);
     string lineStr;
     vector<vector<string> > strArray;
