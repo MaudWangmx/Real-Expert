@@ -5,6 +5,7 @@
 #include <string>
 #include <queue>
 #include <map>
+#include <algorithm>
 
 using namespace std;
 
@@ -13,8 +14,9 @@ typedef struct{
     int id;
     string site_name;
     int bandwidth;
-    bool operator == (const string &e){
-        return (this->site_name == e);
+    int qos_num;
+    bool operator == (const string &name){
+        return (this->site_name == name);
     }
 } site; // 边缘节点
 
@@ -33,6 +35,9 @@ public:
     vector<int> qos; //需求qos
     vector<string> qos_name;
     vector<vector<info>> infos; //分配的结果
+    bool operator == (const string &name){
+        return (this->customer_name == name);
+    }
 };
 
 
@@ -62,6 +67,31 @@ int str_to_int(string s){
         ans = ans * 10 + s[i]-'0';
     }
     return ans;
+}
+
+void qsort_site(vector<int> &a, int low, int high, vector<site> &sites){
+    if (high <= low) return;
+    int i = low;
+    int j = high;
+    int key_index = low;
+    int key = sites[a[low]].bandwidth/sites[a[low]].qos_num;
+    while(i<j){
+        while (i < j && sites[a[j]].bandwidth/sites[a[j]].qos_num <= key){
+            j--;
+        }
+        while (i < j && sites[a[i]].bandwidth/sites[a[i]].qos_num >= key){      
+            i++;
+        } 
+        if ( i >= j) break;
+        int temp = a[i];
+        a[i] = a[j];
+        a[j] = temp;
+    }
+    int temp = a[low];
+    a[low] = a[j];
+    a[j] = temp;
+    qsort_site(a, low, j-1, sites);
+    qsort_site(a,j+1, high, sites);
 }
 
 // 读csv文件
@@ -97,7 +127,7 @@ int read_qos(string filename){
 
 void initializeData(){
     int Qos = read_qos(datafile_root + "data/config.ini");
-
+    vector<int> cust_index;
     vector<vector<string>> vect = read_csv(datafile_root + "data/site_bandwidth.csv");
     //遍历用 以下读取数据
     vector<string> temp_vect;
@@ -108,6 +138,7 @@ void initializeData(){
     {
         site new_site;
         temp_vect = *ite;
+        new_site.qos_num = 0;
         new_site.id = site_num++;
         new_site.site_name = temp_vect[0];
         new_site.bandwidth = str_to_int(temp_vect[1]);
@@ -138,18 +169,42 @@ void initializeData(){
     }
     vect = read_csv(datafile_root + "data/qos.csv");
     int t = 0;
+    for (int i=0; i<customer_num; i++){
+        string temp_string = vect[0][i+1];
+        if (temp_string[temp_string.size()-1] == '\r'){
+            temp_string = temp_string.substr(0, temp_string.size()-1);
+        }
+        if (temp_string == customers[i].customer_name){
+            cust_index.push_back(i);
+        }
+        else{
+            vector<customer>::iterator result_index = find(customers.begin(), customers.end(), vect[0][i+1]);
+            cust_index.push_back(distance(customers.begin(), result_index));
+        }
+    }
     for (ite = ++vect.begin(); ite != vect.end(); ite++){
+        int idx_t = t;
+        if (sites[t].site_name == vect[t+1][0]){
+            idx_t = t;
+        }
+        else{
+            vector<site>::iterator result_index = find(sites.begin(), sites.end(), vect[t+1][0]);
+            idx_t =  distance(sites.begin(), result_index);
+        }
         temp_vect = *ite;
-        itc = customers.begin();
+        int c_i = 0;
         for (auto itee = ++temp_vect.begin(); itee != temp_vect.end(); itee++){
             if(str_to_int(*itee) < Qos){
-                itc->qos.push_back(t);
+                customers[cust_index[c_i]].qos.push_back(idx_t);
+                sites[idx_t].qos_num++;
             }
-            // cout << str_to_int(*itee) << endl;
-            itc++;
+            c_i++;
         }
+       
         t++;
-
+    }
+    for (int i=0; i<customer_num; i++){
+        qsort_site(customers[i].qos, 0, int(customers[i].qos.size())-1, sites);
     }
 }
 
