@@ -5,6 +5,7 @@
 #include<cstring>
 #include<fstream>
 #include<math.h>
+#include <set>
 using namespace std;
 
 typedef struct{
@@ -21,13 +22,13 @@ typedef struct{
 
 
 class customer{ //客户
-    public:
-        customer(int id, string customer_name):id(id), customer_name(customer_name){}
-        int id;
-        string customer_name;
-        vector<int> bandwidth_need; //需求带宽
-        vector<int> qos; //需求qos
-        vector<vector<info>> infos; //分配的结果
+public:
+    customer(int id, string customer_name):id(id), customer_name(customer_name){}
+    int id;
+    string customer_name;
+    vector<int> bandwidth_need; //需求带宽
+    vector<int> qos; //需求qos
+    vector<vector<info>> infos; //分配的结果
 };
 
 
@@ -81,6 +82,13 @@ int read_qos(string filename){ //读取qos
 }
 
 
+void checkArrange(int* site_used, int** arrange = nullptr){
+    static ofstream outfile(datafile_root + "output/checkarrange.txt");
+    for (int i = 0; i < site_num; i++)
+        outfile << sites[i].site_name << " : " << site_used[i] << " percent: " << (float)site_used[i] / sites[i].bandwidth<< endl ;
+    return;
+}
+
 
 
 void initializeData(){
@@ -105,7 +113,7 @@ void initializeData(){
     ite = vect.begin();
     temp_vect = *ite;
 
-    
+
     for (vector<string>::iterator itee = ++temp_vect.begin(); itee != temp_vect.end(); itee++){
         string s_t = *itee;
         int l_t = s_t.size();
@@ -133,7 +141,7 @@ void initializeData(){
             if(str_to_int(*itee) < Qos){
                 itc->qos.push_back(t);
                 sites[t].servable_customers.push_back(itc->id);
-            } 
+            }
             // cout << str_to_int(*itee) << endl;
             itc++;
         }
@@ -204,10 +212,11 @@ bool arrangeBaseOnCustomers(int* sitesUsed, int* customerSatisfied, int t, int**
         if (n == 0 && customer_unsatisfied > 0)
             return false;
         int average_bandwidth = ceil((double)customer_unsatisfied / n);
-
         //n = n / 4 != 0 ? n/4 : n;
-        if (n > 4)
-            average_bandwidth = ceil(customer_unsatisfied / (n/4));
+        //if (n > 4)
+        //    average_bandwidth = ceil(customer_unsatisfied / (n/4));
+
+
         int bandwidth_need = average_bandwidth;
         int s = 0;
         for (; s < n - 1; s++){     // s for the site index in one customer's qos list
@@ -286,6 +295,11 @@ void arrangeOneSite(int site_id, int site_average, int t, int* customer_satisfie
     int n = sites[s].servable_customers.size();
     if (n == 0)
         return;
+    if (site_average > sites[s].bandwidth - site_used[s])
+        site_average = sites[s].bandwidth - site_used[s];
+
+    if (s == 0 && t == 0)
+        cout << site_average << endl;
     //int site_average_c = floor(site_average / n);
     int site_weights[n];
     int total_weight = 0;
@@ -295,32 +309,44 @@ void arrangeOneSite(int site_id, int site_average, int t, int* customer_satisfie
             site_weights[i] = 0;
             continue;
         }
-        site_weights[i] = customers[sites[s].servable_customers[i]].bandwidth_need[t] / customers[sites[s].servable_customers[i]].qos.size();
+        //site_weights[i] = customers[sites[s].servable_customers[i]].bandwidth_need[t] / customers[sites[s].servable_customers[i]].qos.size();
+        site_weights[i] = (customers[sites[s].servable_customers[i]].bandwidth_need[t] - customer_satisfied[sites[s].servable_customers[i]] ) / customers[sites[s].servable_customers[i]].qos.size();
         total_weight += site_weights[i];
     }
     if (total_weight == 0)
         return;
     int site_average_c = floor(site_average / total_weight);
+    if (t == 0 && s == 0)
+        cout << "site_a_c: " << site_average_c << endl;
+    int temp = 0;
     for (int i = 0; i < n; i++){        // i for customer index in one site's servable_customers list
         int customer_id = sites[s].servable_customers[i];
 
         int customer_unsatisfied = customers[customer_id].bandwidth_need[t] - customer_satisfied[customer_id];
         int site_index = findSiteIndexInQosList(customer_id, s);
-        int site_weighted_give = site_average_c * site_weights[i];
-        // cout << customer_unsatisfied << endl;
+        int site_weighted_give = (int)site_average * ((double)site_weights[i]/total_weight);
+        if (sites[s].bandwidth - site_used[s] < site_weighted_give)
+            site_weighted_give = sites[s].bandwidth - site_used[s];
+
+        temp += site_weighted_give;
+
         if (site_weighted_give <= customer_unsatisfied){
+
+            // cout << " customer: " << customers[customer_id].id << " " <<  site_weighted_give << endl;
             arrangement[customer_id][site_index] += site_weighted_give;
             //customers[customer_id].infos[t].push_back({sites[s].site_name, site_average_c});
             site_used[s] += site_weighted_give;
             customer_satisfied[customer_id] += site_weighted_give;
         }else{
+            // cout << " customer: " << customers[customer_id].id<< " "  << customer_unsatisfied << endl;
             arrangement[customer_id][site_index] += customer_unsatisfied;
             //customers[customer_id].infos[t].push_back({sites[s].site_name, customer_unsatisfied});
             site_used[s] += customer_unsatisfied;
             customer_satisfied[customer_id] += customer_unsatisfied;
         }
-
     }
+    if (t == 0 && s == 0)
+        cout <<"temp: "  << temp << endl;
 }
 bool arrangeBaseOnSites(){
 
@@ -347,40 +373,6 @@ bool arrangeBaseOnSites(){
         int site_average = ceil((double)total_bandwidth/site_num);
         for (int s = 0; s < site_num; s++){
             arrangeOneSite(s, site_average, t, customer_satisfied, site_used, arrangement);
-            /*
-            int n = sites[s].servable_customers.size();
-            if (n == 0)
-                continue;
-            //int site_average_c = floor(site_average / n);
-            int site_weights[n];
-            int total_weight = 0;
-
-            for (int i = 0; i < n; i++){
-                site_weights[i] = customers[sites[s].servable_customers[i]].bandwidth_need[t] / customers[sites[s].servable_customers[i]].qos.size();
-                total_weight += site_weights[i];
-            }
-            int site_average_c = floor(site_average / total_weight);
-            for (int i = 0; i < n; i++){        // i for customer index in one site's servable_customers list
-                int customer_id = sites[s].servable_customers[i];
-
-                int customer_unsatisfied = customers[customer_id].bandwidth_need[t] - customer_satisfied[customer_id];
-                int site_index = findSiteIndexInQosList(customer_id, s);
-                int site_weighted_give = site_average_c * site_weights[i];
-                // cout << customer_unsatisfied << endl;
-                if (site_weighted_give <= customer_unsatisfied){
-                    arrangement[customer_id][site_index] = site_weighted_give;
-                    //customers[customer_id].infos[t].push_back({sites[s].site_name, site_average_c});
-                    site_used[s] += site_weighted_give;
-                    customer_satisfied[customer_id] += site_weighted_give;
-                }else{
-                    arrangement[customer_id][site_index] = customer_unsatisfied;
-                    //customers[customer_id].infos[t].push_back({sites[s].site_name, customer_unsatisfied});
-                    site_used[s] += customer_unsatisfied;
-                    customer_satisfied[customer_id] += customer_unsatisfied;
-                }
-
-            }
-            */
         }
         arrangeBaseOnCustomers(site_used, customer_satisfied, t, arrangement);
         for (int i = 0; i < customer_num; i++){
@@ -399,21 +391,41 @@ bool arrangeBaseOnSites(){
 }
 
 bool trick(){
+    int temp = 0;
+    for (int i = 0; i < sites[site_num - 1].servable_customers.size(); i++) {
+        temp += customers[sites[site_num - 1].servable_customers[i]].bandwidth_need[0];
+        cout << sites[site_num - 1].servable_customers[i] << " ";
+    }
+    cout << endl << temp << endl;
+
+    /* initialize some tempUse structure */
     int* site_used = new int[site_num];
     int* customer_satisfied = new int[customer_num];
-
     int** arrangement = new int*[customer_num];
+    set<int> useless_sites;
     for (int i = 0; i < customer_num; i++) {
         arrangement[i] = new int[customers[i].qos.size()];
         memset(arrangement[i], 0, customers[i].qos.size() * sizeof(int));
     }
-    int timeP = (int) T * 0.05 - 1;     // clicks of a time piece
+    int useful_site_num = site_num;
+    for (int i = 0; i < site_num; i++){
+        if (sites[i].servable_customers.size() <= 0) {
+            useless_sites.insert(i);
+            useful_site_num--;
+        }
+    }
+    int timeP = (int) T * 0.05;     // clicks of a time piece 24s
     if (timeP > 0){
-        int site_num_per_tp = (int)(site_num - 1) * timeP / T;  // num of sites chosen per tp
-        int timeP_num = ceil((double)T / timeP);    // num of time pieces
+        int timeP_num = ceil((double)T / timeP);    // num of time pieces  21
+
+        int site_num_per_tp = round((double)useful_site_num / timeP_num);// num of sites chosen per tp   9
+
+        int start_site = 0, site_focus = 0;
         for (int inter = 0; inter < timeP_num && timeP * inter < T; inter++ ){
             /* in a time piece */
-            int start_site = inter * site_num_per_tp;
+            start_site = site_focus;
+            if (inter == timeP_num - 1)
+                site_num_per_tp  = useful_site_num - (timeP_num - 1) * site_num_per_tp;
             for (int tp = 0; tp < timeP; tp++){
                 /* in a click of a time piece */
                 int t = timeP * inter + tp;
@@ -429,10 +441,17 @@ bool trick(){
                     customers[i].infos.push_back(temp_info);
                     memset(arrangement[i], 0, customers[i].qos.size() * sizeof(int));
                 }
-                for (int site_focus = start_site; site_focus < start_site + site_num_per_tp && site_focus < site_num; site_focus++){
+                site_focus = start_site;
+                for (int useful_count = 0; useful_count < site_num_per_tp && site_focus < site_num; site_focus++){
                     /* fill one site*/
-                    arrangeOneSite(site_focus, sites[site_focus].bandwidth, t, customer_satisfied, site_used, arrangement);
+                    if (useless_sites.find(site_focus) != useless_sites.end())
+                        continue;
+                    useful_count++;
+                    arrangeOneSite(site_focus, sites[site_focus].bandwidth * 0.95, t, customer_satisfied, site_used, arrangement);
+                    //arrangeOneSite(site_focus, sites[site_focus].bandwidth, t, customer_satisfied, site_used, arrangement);
                     total_bandwidth -= site_used[site_focus];
+
+                    // cout << "t: " << t << " " << site_focus << " :" << site_used[site_focus] << endl;
                 }
                 if (site_num - site_num_per_tp <= 0){
                     if (total_bandwidth == 0)
@@ -440,14 +459,20 @@ bool trick(){
                     else
                         return false;
                 }
-                int site_average = total_bandwidth / (site_num - site_num_per_tp);
-                for (int site_focus = 0; site_focus < start_site; site_focus++){
-                    arrangeOneSite(site_focus, site_average, t, customer_satisfied, site_used, arrangement);
+                int site_average = total_bandwidth / (useful_site_num - site_num_per_tp);
+                for (int site_focus_pre = 0; site_focus_pre < start_site; site_focus_pre++){
+                    arrangeOneSite(site_focus_pre, site_average, t, customer_satisfied, site_used, arrangement);
                 }
-                for (int site_focus = start_site + site_num_per_tp; site_focus < site_num; site_focus++){
-                    arrangeOneSite(site_focus, site_average, t, customer_satisfied, site_used, arrangement);
+                for (int site_focus_tail = site_focus; site_focus_tail < site_num; site_focus_tail++){
+                    arrangeOneSite(site_focus_tail, site_average, t, customer_satisfied, site_used, arrangement);
                 }
+
                 arrangeBaseOnCustomers(site_used, customer_satisfied, t, arrangement);
+                if ( t == 0) {
+                    cout << site_used[0] << endl;
+                    cout << arrangement[0][0] << endl;
+                }
+                checkArrange(site_used);
                 for (int i = 0; i < customer_num; i++){
                     int n = customers[i].qos.size();
                     for (int j = 0; j < n; j++){
@@ -458,6 +483,7 @@ bool trick(){
                 }
             }
         }
+        cout << "here!" << endl;
         return true;
     }
     else
@@ -465,13 +491,13 @@ bool trick(){
 }
 
 int main(){
-    
+
     initializeData();
     //arrangeBaseOnSites();
     //completelyOnCustomers();
     //vanillaAlgorithm();
     if (!trick())
-        completelyOnCustomers();
+        cout << "error" << endl;
     outputRes();
     return 0;
 }
