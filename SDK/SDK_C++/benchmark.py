@@ -482,7 +482,7 @@ class OutputAnalyser():
             print(f'final score 1: {score}')
         else:
             print(f'final score: {score}')
-        print(f'separate cost: {server_history[idx]}')
+        print(f'separate cost: {server_history[idx]/bandwidth}')
 
     def calc_score_2(self):
         if self.count not in [0, self.max]:

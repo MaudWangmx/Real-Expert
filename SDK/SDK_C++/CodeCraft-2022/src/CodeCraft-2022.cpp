@@ -46,14 +46,17 @@ int site_num = 0;
 vector<customer> customers; //客户的集合
 int customer_num = 0;
 int T = 0;
-int Qos = 0;
 
 // dinic算法所需变量
 int const INF = 0x3f3f3f3f;
 int const MAX_P = 135 + 35 + 5;
 int numP; // 点的个数
-int graphic[MAX_P][MAX_P]; // 所需的图
+int graphic[MAX_P][MAX_P]; // 构建的图
 int dep[MAX_P]; // 点所在的层数
+// 优化所用变量
+int* site_used_times; // 边缘节点当前使用次数（每一时刻若有客户使用该节点，则使用次数+1）
+int* site_used_bandwidth; // 在某一时刻，边缘节点已使用的带宽（每时刻初始清零）
+int timeP; // 计算百分之五的时间（向下取整）
 
 string datafile_root = "../";
 
@@ -73,7 +76,6 @@ void qsort_site(vector<int> &a, int low, int high, vector<site> &sites){
     if (high <= low) return;
     int i = low;
     int j = high;
-    int key_index = low;
     int key = sites[a[low]].bandwidth/sites[a[low]].qos_num;
     while(i<j){
         while (i < j && sites[a[j]].bandwidth/sites[a[j]].qos_num <= key){
@@ -92,6 +94,65 @@ void qsort_site(vector<int> &a, int low, int high, vector<site> &sites){
     a[j] = temp;
     qsort_site(a, low, j-1, sites);
     qsort_site(a,j+1, high, sites);
+}
+
+void check(vector<int> &nodes, int t){
+    static ofstream outfile(datafile_root + "output/check.txt");
+    for (int i = 0; i < site_num; i++){
+        outfile << "[" << nodes[i] << "]"<< (float)site_used_bandwidth[nodes[i]] / sites[nodes[i]].bandwidth << " (" << site_used_times[nodes[i]] << ")      ";
+    }
+    outfile << endl << endl;
+    outfile << t << endl;
+}
+
+bool siteUsedTimeCmp(int x, int y){
+    return site_used_times[x] > site_used_times[y];
+}
+
+// 95策略：每一时刻初始根据site_used_times数组排序，其中使用次数未达timeP次的排在前面
+void sortBetweenTimes(vector<int> &nodes, int t){
+    int index;
+    sort(nodes.begin(), nodes.end(), siteUsedTimeCmp);
+
+    for (index = 0; index < site_num; index++){ // 遍历nodes
+        if (site_used_times[nodes[index]] < timeP) // timeP - 1
+            break;
+    }
+    if (index == site_num)
+        return;
+    vector<int> temp;
+    for (int i = index; i < site_num; i++)
+        temp.push_back(nodes[i]);
+    for (int i = 0; i < index; i++)
+        temp.push_back(nodes[i]);
+    for (int i = 0; i < site_num; i++)
+        nodes[i] = temp[i];
+
+//    for(int i = 0; i < nodes.size(); i++){
+//        cout << site_used_times[nodes[i]] << " ";
+//    }
+//    cout <<endl;
+    check(nodes, t);
+
+}
+
+bool siteUsedBandwidthCmp(int x, int y){
+    return site_used_bandwidth[x] > site_used_bandwidth[y];
+}
+
+// 一个失败的排序
+void sortInTime(vector<int> &nodes, int t){
+    int index;
+    for (index = 0; index < site_num; index++){
+        if (site_used_times[nodes[index]] >= timeP)
+            break;
+    }
+    if (index != 0)
+        stable_sort(nodes.begin(), nodes.begin() + index, siteUsedBandwidthCmp);
+    if (index != site_num)
+        stable_sort(nodes.begin() + index, nodes.end(), siteUsedBandwidthCmp);
+
+    check(nodes, t);
 }
 
 // 读csv文件
@@ -260,6 +321,7 @@ void vanillaAlgorithm(){
 
 // 重新按层次建图
 // s为源点，t为汇点
+// 源点在第0层，客户节点在第1层，边缘节点在第2层，汇点在第3层
 int dinicBfs(int s, int t){
     queue<int> q;
     while(!q.empty()){
@@ -282,13 +344,15 @@ int dinicBfs(int s, int t){
 }
 
 // 查找路径上的最小流量
-int dinicDfs(int s, int minFlow, int t, map<int, int> &infoMap){
+// sitesOrder为排序后的site下标
+int dinicDfs(int s, int minFlow, int t, map<int, int> &infoMap, vector<int> sitesOrder){
     if(s == t){
         return minFlow;
     }
+
     int tmp;
-    for(int v = 0; v <= numP - 1; v++){
-        if(graphic[s][v] > 0 && dep[v] == dep[s] + 1 && (tmp = dinicDfs(v, min(minFlow, graphic[s][v]), t, infoMap))){
+    for(int v = 0; v <= customer_num; v++){
+        if(graphic[s][v] > 0 && dep[v] == dep[s] + 1 && (tmp = dinicDfs(v, min(minFlow, graphic[s][v]), t, infoMap, sitesOrder))){
             graphic[s][v] -= tmp;
             graphic[v][s] += tmp;
 
@@ -300,10 +364,12 @@ int dinicDfs(int s, int minFlow, int t, map<int, int> &infoMap){
                 else{
                     infoMap[hash] += tmp;
                 }
+                site_used_bandwidth[v - customer_num - 1] += tmp;
             }
             else if(v >= 1 && v <= customer_num && s >= customer_num + 1 && s <= customer_num + site_num){
                 int hash = (s - customer_num - 1) * 100 + (v - 1);
                 infoMap[hash] -= tmp;
+                site_used_bandwidth[s - customer_num - 1] -= tmp;
                 if(infoMap[hash] < 0){
                     cout << "ERROR! infoMap[hash] < 0" << endl;
                 }
@@ -312,11 +378,47 @@ int dinicDfs(int s, int minFlow, int t, map<int, int> &infoMap){
             return tmp;
         }
     }
+
+    // for(int v = customer_num + 1; v <= numP - 1; v++){
+    for(int num = 0, v; num <= sitesOrder.size(); num++){
+        if(num == sitesOrder.size()){
+            v = numP - 1;
+        }
+        else{
+            v = customer_num + 1 + sitesOrder[num];
+        }
+        if(graphic[s][v] > 0 && dep[v] == dep[s] + 1 && (tmp = dinicDfs(v, min(minFlow, graphic[s][v]), t, infoMap, sitesOrder))){
+            graphic[s][v] -= tmp;
+            graphic[v][s] += tmp;
+
+            if(s >= 1 && s <= customer_num && v >= customer_num + 1 && v <= customer_num + site_num){
+                int hash = (v - customer_num - 1) * 100 + (s - 1);
+                if(infoMap.count(hash) == 0 || infoMap[hash] == 0){
+                    infoMap[hash] = tmp;
+                }
+                else{
+                    infoMap[hash] += tmp;
+                }
+                site_used_bandwidth[v - customer_num - 1] += tmp;
+            }
+            else if(v >= 1 && v <= customer_num && s >= customer_num + 1 && s <= customer_num + site_num){
+                int hash = (s - customer_num - 1) * 100 + (v - 1);
+                infoMap[hash] -= tmp;
+                site_used_bandwidth[s - customer_num - 1] -= tmp;
+                if(infoMap[hash] < 0){
+                    cout << "ERROR! infoMap[hash] < 0" << endl;
+                }
+            }
+
+            return tmp;
+        }
+    }
+
     return 0;
 }
 
 // t为时刻
-int dinic(int t, map<int, int> &infoMap){
+int dinic(int t, map<int, int> &infoMap, vector<int>& sitesOrder){
     // 每一时刻初始化图
     memset(graphic, 0, sizeof(graphic));
     numP = site_num + customer_num + 2; // 客户：1 ~ customer_num (id + 1)
@@ -335,11 +437,13 @@ int dinic(int t, map<int, int> &infoMap){
         graphic[u][numP - 1] = sites[i].bandwidth;
     }
 
+    // 算法核心
     int ans = 0, tmp;
     // 源点为0，汇点为customer_num + site_num + 1(numP - 1)
     while(dinicBfs(0, numP - 1)){
         while(true){
-            tmp = dinicDfs(0, INF, numP - 1, infoMap);
+            // sortInTime(sitesOrder, t);
+            tmp = dinicDfs(0, INF, numP - 1, infoMap, sitesOrder);
             if(tmp == 0){
                 break;
             }
@@ -350,13 +454,31 @@ int dinic(int t, map<int, int> &infoMap){
 }
 
 void dinicAlgorithm(){
+    site_used_times = new int[site_num];
+    memset(site_used_times, 0, site_num * sizeof(int));
+    timeP = (int) (T * 0.05) ;
+
+    site_used_bandwidth = new int[site_num];
+
     for(int i = 0; i < customer_num; i++){
         customers[i].infos.resize(T);
     }
-    for(int t = 0; t < T; t++){
-        map<int, int> infoMap;
-        dinic(t, infoMap);
 
+    for(int t = 0; t < T; t++){
+        map<int, int> infoMap; // 当前时刻分配方案
+
+        memset(site_used_bandwidth, 0, site_num * sizeof(int)); // 初始化当前时刻边缘节点已用带宽
+
+        // 每一时刻选取边缘节点的顺序
+        vector<int> sitesOrder;
+        for(int i = 0; i < site_num; i++){
+            sitesOrder.push_back(i);
+        }
+        sortBetweenTimes(sitesOrder, t);
+
+        dinic(t, infoMap, sitesOrder);
+
+        vector<int> usedFlags(site_num, 0);
         // 处理输出
         for(auto & it : infoMap) {
             // cout << it.first << " " << it.second << "\n";
@@ -364,6 +486,12 @@ void dinicAlgorithm(){
             int iSite = it.first / 100;
             if(it.second != 0) {
                 customers[iCus].infos[t].push_back({sites[iSite].site_name, it.second});
+                usedFlags[iSite] = 1;
+            }
+        }
+        for(int i = 0; i < site_num; i++){
+            if(usedFlags[i]){
+                site_used_times[i]++;
             }
         }
 
@@ -374,7 +502,7 @@ void dinicAlgorithm(){
 int main(){
     initializeData();
 
-    // vanillaAlgorithm();
+    //vanillaAlgorithm();
     dinicAlgorithm();
 
     outputRes();
