@@ -8,7 +8,7 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/Users/yhp/Documents/learning/HUAWEI/Real-Expert/SDK/SDK_C++/CodeCraft-2022/src/CodeCraft-2022.cpp" "CMakeFiles/CodeCraft-2022.dir/CodeCraft-2022.cpp.o" "gcc" "CMakeFiles/CodeCraft-2022.dir/CodeCraft-2022.cpp.o.d"
+  "/Users/wangmingxuan/Downloads/Real-Expert/SDK/SDK_C++/CodeCraft-2022/src/CodeCraft-2022.cpp" "CMakeFiles/CodeCraft-2022.dir/CodeCraft-2022.cpp.o" "gcc" "CMakeFiles/CodeCraft-2022.dir/CodeCraft-2022.cpp.o.d"
   )
 
 # Targets to which this target links.

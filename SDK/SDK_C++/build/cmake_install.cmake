@@ -1,4 +1,4 @@
-# Install script for directory: /Users/yhp/Documents/learning/HUAWEI/Real-Expert/SDK/SDK_C++/CodeCraft-2022/src
+# Install script for directory: /Users/wangmingxuan/Downloads/Real-Expert/SDK/SDK_C++/CodeCraft-2022/src
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -45,5 +45,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/Users/yhp/Documents/learning/HUAWEI/Real-Expert/SDK/SDK_C++/build/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/Users/wangmingxuan/Downloads/Real-Expert/SDK/SDK_C++/build/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
